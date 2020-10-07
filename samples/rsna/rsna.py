@@ -78,15 +78,15 @@ DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 #  Configurations
 ############################################################
 
-# This function keeps the learning rate at 0.001 
+# This function keeps the learning rate at 0.0001 
 # for the first five epochs and decreases it 
 # exponentially after that.
 def scheduler(epoch):
     print("Epoch:", epoch)
     if epoch < 5:
-        return 0.001
+        return 0.0001
     else:
-        return 0.001 * math.pow(math.e, 0.1 * (5 - epoch))
+        return 0.0001 * math.pow(math.e, 0.1 * (5 - epoch))
     
 # TODO: update the value
 CUSTOM_LR = 0
@@ -113,7 +113,7 @@ class RsnaConfig(Config):
     NUM_CLASSES = 1 + 1  # Background + 1 class (pneumonia)
     
     # Learning rate and momentum
-    LEARNING_RATE = 0.001
+    LEARNING_RATE = 0.0001
     LEARNING_MOMENTUM = 0.9
     
     # Loss weights for more precise optimization.
@@ -289,7 +289,7 @@ def train(model, model_path):
         keras.callbacks.LearningRateScheduler(scheduler, verbose=1)
     ]
     
-    # *** This training schedule is an example. Update to your needs ***
+    # *** This training schedule is an example. Update to your needs. In case of OOM in stage 3, comment out the other two ***
     
     # Training - Stage 1
     # Train the head branches
@@ -300,7 +300,7 @@ def train(model, model_path):
     print("Training network heads")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=100,
+                epochs=40,
                 layers='heads', augmentation=seq, custom_callbacks=custom_callbacks)
     
     # Save weights
@@ -314,7 +314,7 @@ def train(model, model_path):
     print("Fine tune Resnet stage 4 and up")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=150,
+                epochs=70,
                 layers='4+', augmentation=seq, custom_callbacks=custom_callbacks)
     
     model.keras_model.save_weights(model_path)
@@ -327,7 +327,7 @@ def train(model, model_path):
     print("Fine tune all layers")
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
-                epochs=200,
+                epochs=100,
                 layers='all', augmentation=seq, custom_callbacks=custom_callbacks)
     
     model.keras_model.save_weights(model_path)
@@ -402,11 +402,14 @@ if __name__ == '__main__':
 
     # Load weights
     print("Loading weights ", weights_path)
-    # Exclude the last layers because they require a matching
-    # number of classes
-    model.load_weights(weights_path, by_name=True, exclude=[
-        "mrcnn_class_logits", "mrcnn_bbox_fc",
-        "mrcnn_bbox", "mrcnn_mask"])
+    if args.weights.lower() == "coco":
+        # Exclude the last layers because they require a matching
+        # number of classes
+        model.load_weights(weights_path, by_name=True, exclude=[
+            "mrcnn_class_logits", "mrcnn_bbox_fc",
+            "mrcnn_bbox", "mrcnn_mask"])
+    else:
+        model.load_weights(weights_path, by_name=True)
 
     # Train or evaluate
     if args.command == "train":
