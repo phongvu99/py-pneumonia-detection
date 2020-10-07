@@ -815,9 +815,12 @@ class DetectionLayer(KE.Layer):
         # Reshape output
         # [batch, num_detections, (y1, x1, y2, x2, class_id, class_score)] in
         # normalized coordinates
+        # Change self.config.BATCH_SIZE to self.config.IMAGES_PER_GPU
+        # PR [Bug fix]: predict error on multi-gpu #1082
+        # https://github.com/matterport/Mask_RCNN/pull/1082/files
         return tf.reshape(
             detections_batch,
-            [self.config.BATCH_SIZE, self.config.DETECTION_MAX_INSTANCES, 6])
+            [self.config.IMAGES_PER_GPU, self.config.DETECTION_MAX_INSTANCES, 6])
 
     def compute_output_shape(self, input_shape):
         return (None, self.config.DETECTION_MAX_INSTANCES, 6)
@@ -2339,17 +2342,16 @@ class MaskRCNN():
         callbacks = [
             keras.callbacks.TensorBoard(log_dir=self.log_dir,
                                         histogram_freq=0, write_graph=True, write_images=False),
-            keras.callbacks.ModelCheckpoint(self.checkpoint_path,
-                                            verbose=0, save_weights_only=True),
         ]
 
         # Add custom callbacks to the list
         if custom_callbacks:
-            callbacks += custom_callbacks
+            callbacks += custom_callbacks   
 
         # Train
         log("\nStarting at epoch {}. LR={}\n".format(self.epoch, learning_rate))
         log("Checkpoint Path: {}".format(self.checkpoint_path))
+        log("\nCallbacks: {}".format(callbacks))
         self.set_trainable(layers)
         self.compile(learning_rate, self.config.LEARNING_MOMENTUM)
 
